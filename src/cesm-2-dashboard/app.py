@@ -275,9 +275,6 @@ class ClimateViewer(param.Parameterized):
         self._plot_ts()
         self._plot_year_marker()
         self._style_ts()
-
-        # Style
-        self.ClimateViewer.BackgroundColor = 'red'
     
     ## DATA
     @param.depends('variable', 'forcing_type', 'year', watch=True)
