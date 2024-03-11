@@ -124,7 +124,7 @@ variables = list(sorted(ds.keys(), reverse=True))
 forcing_types = list(ds.coords['forcing_type'].values)
 
 DESCRIPTION = pn.pane.HTML("""
-<h1 style="color:red">
+<h1>
     User Guide
 </h1>
 <h2>
