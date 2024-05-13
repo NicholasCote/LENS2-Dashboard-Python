@@ -17,7 +17,7 @@ jobs:
         id: date
         run: echo "date=$(date +'%Y-%m-%d.%H.%M')" >> $GITHUB_OUTPUT
       - name: Login to Harbor
-        run: podman login hub.k8s.ucar.edu -u ncote -p ${{ secrets.NCOTE_HARBOR_LOGIN  }}
+        run: podman login hub.k8s.ucar.edu -u robot-ncote+dataflask -p ${{ secrets.HARBOR_ROBOT_PW  }}
       - name: Build LENS2 image
         run: podman build --format=docker -t hub.k8s.ucar.edu/ncote/lens2-docker:${{ steps.date.outputs.date }} .
       - name: Build Dask image
