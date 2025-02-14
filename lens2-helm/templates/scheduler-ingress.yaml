@@ -19,16 +19,8 @@ spec:
   - host: {{ .Values.webapp.tls.fqdn }}
     http:
       paths:
-      - path: {{ .Values.scheduler.path }}(/|$)(.*)
+      - path: {{ .Values.scheduler.path }}/?(.*)
         pathType: ImplementationSpecific
-        backend:
-          service:
-            name: {{ .Values.scheduler.name }}
-            port:
-              number: {{ .Values.scheduler.container.dashboardPort }}
-      # Add an additional path specifically for the dashboard without trailing slash
-      - path: {{ .Values.scheduler.path }}
-        pathType: Exact
         backend:
           service:
             name: {{ .Values.scheduler.name }}
