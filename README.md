@@ -1,10 +1,10 @@
-# Interactive LENS-2 Dashboard  
+# Interactive LENS-2 Dashboard
 
 This repository hosts notebooks and code written to visualize the [CESM-LENS2](https://www.cesm.ucar.edu/community-projects/lens2) dataset.
 
 | GitHub Action | Status |
 | --- | --- |
-| LENS2 CICD Pipeline |  ![Build](https://github.com/negin513/LENS2-Dashboard-Python/actions/workflows/cicd-workflow.yaml/badge.svg) |
+| LENS2 CICD Pipeline |  ![Build](https://github.com/NicholasCote/LENS2-Dashboard-Python/actions/workflows/cicd-workflow.yaml/badge.svg) |
 
 ## Running Locally
 
