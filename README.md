@@ -53,14 +53,14 @@ After creating and activating the environment:
 
 ### Using Docker Locally with separate containers for Dask
 ***Note:*** Make sure app.py has `CLUSTER_TYPE = 'scheduler:8786'` set before building the container image. 
-The commands used will pull from the ncote Docker Hub repository if you do not build locally.
-You can specify your own docker image names to replace anything that begins with `ncote/`
+The commands used will pull from the negins Docker Hub repository if you do not build locally.
+You can specify your own docker image names to replace anything that begins with `negins/`
 
 1. Build the docker images for the web application and dask
 
-`docker build -t ncote/lens2-docker .`
+`docker build -t negins/lens2-docker .`
 
-`docker build -f Dockerfile.dask -t ncote/dask-lens2 .`
+`docker build -f Dockerfile.dask -t negins/dask-lens2 .`
 
 2. Create a docker network to run the containers on
 
@@ -69,13 +69,13 @@ You can specify your own docker image names to replace anything that begins with
 3. Start the Dask schedulers and workers
 ***Note:*** This can be run in individual terminal windows or by running the container in detached mode with the `-d` flag
 
-`docker run --network dask -p 8787:8787 --name scheduler ncote/dask-lens2 dask-scheduler`
+`docker run --network dask -p 8787:8787 --name scheduler negins/dask-lens2 dask-scheduler`
 
-`docker run --network dask ncote/dask-lens2 dask-worker scheduler:8786`
+`docker run --network dask negins/dask-lens2 dask-worker scheduler:8786`
 
 4. Start the Web Application
 
-`docker run -e ENV_NAME=lens2 --network dask -p 5006:5006 ncote/lens2-docker`
+`docker run -e ENV_NAME=lens2 --network dask -p 5006:5006 negins/lens2-docker`
 
 ## Running on Kubernetes (K8s)
 ### Push image to Container Registry
@@ -84,18 +84,18 @@ In order to deploy your container build on K8s it needs to be located in a conta
 
 1. Tag your image with a descriptive tag, `:latest` should not be used
 
-`docker tag ncote/lens2-docker:latest ncote/lens2-docker:2023-12-8`
+`docker tag negins/lens2-docker:latest negins/lens2-docker:2023-12-8`
 
-`docker tag ncote/dask-lens2:latest ncote/dask-lens2:v1`
+`docker tag negins/dask-lens2:latest negins/dask-lens2:v1`
 
 The first image name is the local container. The second image name is the new tag to be push. 
-*** Note: By default Docker Hub is used. `ncote` is my Docker Hub repository name. A custom container registry can be utilized by providing the repository URL, the repository name, and the image name and tag.
+*** Note: By default Docker Hub is used. `negins` is my Docker Hub repository name. A custom container registry can be utilized by providing the repository URL, the repository name, and the image name and tag.
 
 2. Push the image
 
-`docker push ncote/lens2-docker:2023-12-8`
+`docker push negins/lens2-docker:2023-12-8`
 
-`docker push ncote/dask-lens2:v1`
+`docker push negins/dask-lens2:v1`
 
 The images are now in Docker Hub and can be used in our Helm chart. 
 
