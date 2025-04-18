@@ -58,9 +58,9 @@ You can specify your own docker image names to replace anything that begins with
 
 1. Build the docker images for the web application and dask
 
-`docker build -t negins/lens2-docker .`
+`docker buildx build -f Containerfile -t negins/lens2-docker .`
 
-`docker build -f Dockerfile.dask -t negins/dask-lens2 .`
+`docker buildx build -f Containerfile.dask -t negins/dask-lens2 .`
 
 2. Create a docker network to run the containers on
 

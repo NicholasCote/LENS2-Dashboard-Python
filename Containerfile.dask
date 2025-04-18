@@ -1,5 +1,10 @@
 FROM ghcr.io/dask/dask
 
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update
+RUN apt-get install -y python3.10
+
 RUN mkdir -p /home/mambauser/app
 
 COPY src/cesm-2-dashboard/prepare.sh /usr/bin/prepare.sh

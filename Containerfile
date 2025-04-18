@@ -3,8 +3,14 @@ FROM docker.io/mambaorg/micromamba:latest
 
 USER root
 
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update
+
 # Set the working directory in the container to /app
 WORKDIR /home/mambauser/app
+
+RUN chown mambauser:mambauser /home/mambauser/app
 
 # Copy the current directory contents into the container at /usr/src/app
 COPY --chown=mambauser src/cesm-2-dashboard/ environment.yml .
@@ -18,4 +24,4 @@ EXPOSE 5006
 
 USER mambauser
 
-CMD ["panel", "serve", "app.py", "--allow-websocket-origin=negins-lens2-demo.k8s.ucar.edu", "--autoreload"]
+CMD ["panel", "serve", "app.py", "--allow-websocket-origin=*", "--autoreload"]
