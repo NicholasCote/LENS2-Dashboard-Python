@@ -20,14 +20,17 @@ def stratus_s3_client():
         endpoint = "https://stratus.ucar.edu/"
         session = boto3.session.Session()
         logger.info(f"Creating S3 client with endpoint {endpoint}")
+        
+        # Create a minimal config to avoid sending unsupported headers
         s3_client = session.client(
             service_name='s3',
             endpoint_url=endpoint,
             config=Config(
                 signature_version=UNSIGNED,
-                retries={'max_attempts': 5, 'mode': 'standard'},
-                connect_timeout=30,
-                read_timeout=30
+                s3={'addressing_style': 'path'},  # Use path-style addressing
+                retries={'max_attempts': 3},
+                connect_timeout=60,
+                read_timeout=60
             ),
             verify=False
         )
@@ -44,7 +47,10 @@ def stratus_s3_resource():
         s3_resource = session.resource(
             service_name='s3',
             endpoint_url=endpoint,
-            config=Config(signature_version=UNSIGNED),
+            config=Config(
+                signature_version=UNSIGNED,
+                s3={'addressing_style': 'path'}  # Use path-style addressing
+            ),
             verify=False
         )
         return s3_resource
