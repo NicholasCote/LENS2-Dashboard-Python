@@ -4,17 +4,19 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python==3.10.12
-  - holoviews
   - bokeh
-  - xarray
+  - boto3
+  - cartopy
   - dask
-  - jupyterlab
+  - dask-jobqueue
   - geoviews
+  - h5netcdf
+  - holoviews
   - hvplot
   - jupyter_bokeh
-  - cartopy
-  - dask-jobqueue
+  - jupyterlab
+  - netcdf4
+  - numpy==2.2.4
+  - python==3.10.12
+  - xarray
   - watchfiles
-  - boto3==1.34.12
-  - toolz==0.12.0

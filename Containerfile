@@ -24,4 +24,4 @@ EXPOSE 5006
 
 USER mambauser
 
-CMD ["panel", "serve", "app.py", "--allow-websocket-origin=*", "--autoreload"]
+CMD ["panel", "serve", "app.py", "--allow-websocket-origin=*"]

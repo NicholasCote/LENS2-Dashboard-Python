@@ -73,7 +73,10 @@ elif CLUSTER_TYPE == 'LocalCluster':
     )
     client = Client(cluster)
 elif CLUSTER_TYPE.startswith('scheduler'):
-    client = Client(CLUSTER_TYPE)
+    client = Client(
+        CLUSTER_TYPE,
+        timeout=3600  # 1 hour timeout
+    )
 else:
     raise "Unknown cluster type"
 
@@ -91,10 +94,22 @@ files = list(parent_dir.glob('*.nc'))
 print(*[f.name for f in files], sep=', ') 
 
 try:
-    ds = xr.open_mfdataset(files, parallel=True)
-except OSError:
+    ds = xr.open_mfdataset(
+        files,
+        parallel=True,
+        chunks={'time': 1, 'lat': 50, 'lon': 50},
+        engine='netcdf4',
+        combine='by_coords'
+    )
+except Exception as e:
+    print(f"Error opening dataset: {e}")
     get_data_files()
-    ds = xr.open_mfdataset(files, parallel=True)
+    ds = xr.open_mfdataset(
+        files,
+        parallel=False,  
+        chunks={'time': 1, 'lat': 50, 'lon': 50},
+        engine='netcdf4'
+    )
     
 ds = ds.convert_calendar('standard')
 ds = ds.assign_coords(lon=(((ds.lon + 180) % 360) - 180))

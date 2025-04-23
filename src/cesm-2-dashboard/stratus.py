@@ -1,83 +1,116 @@
 import os
 import boto3
+import logging
+import sys
 from botocore import UNSIGNED
 from botocore.config import Config
-# These functions are required to download the data sets needed to run the Panel application
-
-# This requests package is imported to disable certificate access warnings. 
-# SSL certificates can be provided and this would not be required.
 import requests.packages.urllib3
-# We aren't verifying certs to start so this line is disable warnings
 requests.packages.urllib3.disable_warnings()
 
-# This file is used to download data files required for the dashboard
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger('stratus')
 
-# Define the Stratus S3 client to be used in other operations
 def stratus_s3_client():
-    # Define the API endpoint for stratus
-    endpoint = "https://stratus.ucar.edu/"
-    # Create a boto3 sessions
-    session = boto3.session.Session()
-    # Create the S3 client based on the variables we set and provided
-    s3_client = session.client(
-        service_name='s3', 
-        endpoint_url=endpoint, 
-        config=Config(signature_version=UNSIGNED),
-        verify=False)
-    # Return the client so that it can be used in other functions
-    return s3_client
+    try:
+        endpoint = "https://stratus.ucar.edu/"
+        session = boto3.session.Session()
+        logger.info(f"Creating S3 client with endpoint {endpoint}")
+        s3_client = session.client(
+            service_name='s3',
+            endpoint_url=endpoint,
+            config=Config(
+                signature_version=UNSIGNED,
+                retries={'max_attempts': 5, 'mode': 'standard'},
+                connect_timeout=30,
+                read_timeout=30
+            ),
+            verify=False
+        )
+        return s3_client
+    except Exception as e:
+        logger.error(f"Failed to create S3 client: {str(e)}")
+        raise
 
-# Define the Stratus S3 resource to be used in other operations    
 def stratus_s3_resource():
-    # Define the API endpoint for stratus
-    endpoint = "https://stratus.ucar.edu/"
-    # Create a boto3 sessions
-    session = boto3.session.Session()
-    # Create the S3 resource based on the variables we set and provided
-    s3_resource = session.resource(
-        service_name='s3', 
-        endpoint_url=endpoint, 
-        config=Config(signature_version=UNSIGNED),
-        verify=False)
-    # Return the client so that it can be used in other functions
-    return s3_resource
+    try:
+        endpoint = "https://stratus.ucar.edu/"
+        session = boto3.session.Session()
+        logger.info(f"Creating S3 resource with endpoint {endpoint}")
+        s3_resource = session.resource(
+            service_name='s3',
+            endpoint_url=endpoint,
+            config=Config(signature_version=UNSIGNED),
+            verify=False
+        )
+        return s3_resource
+    except Exception as e:
+        logger.error(f"Failed to create S3 resource: {str(e)}")
+        raise
 
-# Define a function to list all the objects stored in a bucket
 def list_bucket_objs(bucket):
-    bucket_objs = []
-    # Use the S3 resource already defined to make the call
-    s3_resource = stratus_s3_resource()
-    # Get the individual bucket resources for the bucket name provided in the function 
-    bucket = s3_resource.Bucket(bucket)
-    # Iterate through the response to show all objects contained within the bucket
-    for obj in bucket.objects.all():
-        #print(obj.key)
-        bucket_objs.append(obj.key)
-    return bucket_objs
+    try:
+        bucket_objs = []
+        logger.info(f"Listing objects in bucket: {bucket}")
+        s3_resource = stratus_s3_resource()
+        bucket_resource = s3_resource.Bucket(bucket)
+        
+        count = 0
+        for obj in bucket_resource.objects.all():
+            bucket_objs.append(obj.key)
+            count += 1
+            if count % 100 == 0:
+                logger.info(f"Listed {count} objects so far...")
+        
+        logger.info(f"Found {len(bucket_objs)} objects in bucket {bucket}")
+        return bucket_objs
+    except Exception as e:
+        logger.error(f"Error listing bucket objects: {str(e)}")
+        raise
 
-# Define a function to download a file/object to a bucket
 def download_file(filename, bucketname):
-    # Use the S3 client already defined to make the call
-    s3_client = stratus_s3_client()
-    if "/" in filename:
-        directory_split = filename.split("/")
-        directory_split.pop(len(directory_split)-1)
-        directory = "/".join(directory_split)
-        if os.path.exists(directory):
-            # Open a local file with the same filename as the one we are downloading
-            s3_client.download_file(bucketname, filename, filename)
-        else:
-            os.makedirs(directory, exist_ok=True)
-            s3_client.download_file(bucketname, filename, filename)
-    else:
-            s3_client.download_file(bucketname, filename, filename)
+    try:
+        logger.info(f"Downloading file: {filename} from bucket: {bucketname}")
+        s3_client = stratus_s3_client()
+        
+        if "/" in filename:
+            directory_split = filename.split("/")
+            directory_split.pop(len(directory_split)-1)
+            directory = "/".join(directory_split)
+            if not os.path.exists(directory):
+                logger.info(f"Creating directory: {directory}")
+                os.makedirs(directory, exist_ok=True)
+        
+        # Check if file already exists
+        if os.path.exists(filename):
+            logger.info(f"File already exists: {filename}, skipping download")
+            return
+            
+        logger.info(f"Starting download of {filename}")
+        s3_client.download_file(bucketname, filename, filename)
+        logger.info(f"Successfully downloaded: {filename}")
+    except Exception as e:
+        logger.error(f"Failed to download {filename}: {str(e)}")
+        raise
 
 def get_data_files():
-    bucket_objs = list_bucket_objs('cisl-cloud-users')
-    for objs in bucket_objs:
-        if 'LENS2-ncote-dashboard/data_files' in objs:
-            if '.tar.gz' in objs:
-                pass
-            else:
-                print('Downloading ' + objs)
-                download_file(objs,'cisl-cloud-users')
+    try:
+        logger.info("Starting data file download process")
+        bucket_objs = list_bucket_objs('cisl-cloud-users')
+        
+        file_count = 0
+        for obj in bucket_objs:
+            if 'LENS2-ncote-dashboard/data_files' in obj and not obj.endswith('.tar.gz'):
+                logger.info(f"Processing file: {obj}")
+                download_file(obj, 'cisl-cloud-users')
+                file_count += 1
+                
+        logger.info(f"Download process completed. Downloaded {file_count} files.")
+        return True
+    except Exception as e:
+        logger.error(f"Data download process failed: {str(e)}")
+        raise
