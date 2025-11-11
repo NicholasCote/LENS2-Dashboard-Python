@@ -28,7 +28,7 @@ jobs:
           password: ${{ secrets.HARBOR_ROBOT_PW  }}
       - name: Build LENS2 image
         run: |
-          docker buildx build -t hub.k8s.ucar.edu/ncote/lens2-docker:${{ steps.date.outputs.date }} .
+          docker buildx build -f Containerfile -t hub.k8s.ucar.edu/ncote/lens2-docker:${{ steps.date.outputs.date }} .
       - name: Build Dask image
         run: |
           docker buildx build -f Containerfile.dask -t hub.k8s.ucar.edu/ncote/dask-lens2:${{ steps.date.outputs.date }} .
