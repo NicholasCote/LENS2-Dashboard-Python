@@ -3,16 +3,20 @@ name: LENS2 CICD Pipeline
 # Start the workflow when any updates are made to the src directory in GitHub
 on: 
   push:
-    branches:
-      - main
+    paths:
+      - src/**
+      - Containerfile
+      - Containerfile.dask
+      - requirements.txt
+      - environment.yml
+  workflow_dispatch:
 
 jobs:
   build-n-push-container:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout the repo 
         uses: actions/checkout@v4
-# We use the current date as the tag for the container image
       - name: Get current date
         id: date
         run: echo "date=$(date +'%Y-%m-%d.%H.%M')" >> $GITHUB_OUTPUT
