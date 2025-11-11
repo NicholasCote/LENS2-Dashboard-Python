@@ -24,7 +24,7 @@ jobs:
         uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567
         with:
           registry: hub.k8s.ucar.edu
-          username: robot\$ncote+lens2
+          username: robot$ncote+lens2
           password: ${{ secrets.HARBOR_ROBOT_PW  }}
       - name: Build LENS2 image
         run: |
