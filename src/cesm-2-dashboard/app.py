@@ -21,8 +21,14 @@ import xarray as xr
 import hvplot.xarray
 from pathlib import Path
 
+print("DEBUG: Loading gv.extension")
+
 gv.extension('bokeh')
+print("DEBUG: gv.extension loaded")
+print("DEBUG: Loading hv.extension")
+
 hv.extension('bokeh')
+ print("DEBUG: Hv.extension loaded")
 
 # plot default style
 opts.defaults(
@@ -65,19 +71,19 @@ if CLUSTER_TYPE == 'PBSCluster':
     client.wait_for_workers(32)
 
 elif CLUSTER_TYPE == 'LocalCluster':
-    from dask.distributed import LocalCluster
-    print("DEBUG: Initializing LocalCluster")
-    cluster = LocalCluster(
-        n_workers=2,
-        processes=True,  # Explicitly use processes
-        threads_per_worker=2
-    )
-    print(f"DEBUG: Cluster created, scheduler at: {cluster.scheduler_address}")
-    
-    print("DEBUG: Creating client...")
-    client = Client(cluster, timeout='30s')  # Add explicit timeout
-    print(f"DEBUG: Client connected: {client}")
-    
+    from dask.distributed import Client
+    print("DEBUG: Connecting to auto-started cluster...")
+    try:
+        # Connect to the already-running cluster
+        client = Client(timeout='5s')
+        print(f"DEBUG: Connected to existing cluster: {client}")
+    except Exception as e:
+        print(f"DEBUG: No existing cluster found, creating new one: {e}")
+        from dask.distributed import LocalCluster
+        cluster = LocalCluster(n_workers=2, threads_per_worker=2)
+        client = Client(cluster)
+        print(f"DEBUG: New cluster created: {client}")
+
 elif CLUSTER_TYPE.startswith('scheduler'):
     client = Client(
         CLUSTER_TYPE,
