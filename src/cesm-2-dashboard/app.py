@@ -66,13 +66,18 @@ if CLUSTER_TYPE == 'PBSCluster':
 
 elif CLUSTER_TYPE == 'LocalCluster':
     from dask.distributed import LocalCluster
-    print("Initializing LocalCluster")
+    print("DEBUG: Initializing LocalCluster")
     cluster = LocalCluster(
-        'climate-viewer',
-        n_workers = 2
+        n_workers=2,
+        processes=True,  # Explicitly use processes
+        threads_per_worker=2
     )
-    client = Client(cluster)
-    print("Local Cluster Initialized")
+    print(f"DEBUG: Cluster created, scheduler at: {cluster.scheduler_address}")
+    
+    print("DEBUG: Creating client...")
+    client = Client(cluster, timeout='30s')  # Add explicit timeout
+    print(f"DEBUG: Client connected: {client}")
+    
 elif CLUSTER_TYPE.startswith('scheduler'):
     client = Client(
         CLUSTER_TYPE,
