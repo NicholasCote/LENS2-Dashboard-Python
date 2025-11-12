@@ -93,6 +93,23 @@ parent_dir = Path('/home/mambauser/app/LENS2-ncote-dashboard/data_files/mean/')
 files = list(parent_dir.glob('*.nc'))
 print(*[f.name for f in files], sep=', ') 
 
+print("DEBUG: Checking for data files...")
+data_path = '/home/mambauser/app/LENS2-ncote-dashboard/data_files'
+isExist = os.path.exists(data_path)
+if isExist:
+    print(f"DEBUG: Data path exists: {data_path}")
+else:
+    print(f"DEBUG: Data path doesn't exist, downloading...")
+    get_data_files()
+    print("DEBUG: Download complete")
+
+print("DEBUG: Looking for mean files...")
+parent_dir = Path('/home/mambauser/app/LENS2-ncote-dashboard/data_files/mean/')
+files = list(parent_dir.glob('*.nc'))
+print(f"DEBUG: Found {len(files)} files")
+print(*[f.name for f in files], sep=', ') 
+
+print("DEBUG: Opening mean dataset...")
 try:
     ds = xr.open_mfdataset(
         files,
@@ -102,7 +119,7 @@ try:
         combine='by_coords'
     )
 except Exception as e:
-    print(f"Error opening dataset: {e}")
+    print(f"DEBUG: Error opening dataset: {e}")
     get_data_files()
     ds = xr.open_mfdataset(
         files,
