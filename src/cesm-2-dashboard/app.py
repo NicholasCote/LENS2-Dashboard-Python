@@ -97,7 +97,7 @@ try:
     ds = xr.open_mfdataset(
         files,
         parallel=True,
-        chunks={'time': 1, 'lat': 50, 'lon': 50},
+        chunks={'time': 12, 'lat': 100, 'lon': 100},  # Increased chunk sizes
         engine='netcdf4',
         combine='by_coords'
     )
@@ -107,7 +107,7 @@ except Exception as e:
     ds = xr.open_mfdataset(
         files,
         parallel=False,  
-        chunks={'time': 1, 'lat': 50, 'lon': 50},
+        chunks={'time': 12, 'lat': 100, 'lon': 100},  # Increased chunk sizes
         engine='netcdf4'
     )
     
@@ -118,23 +118,24 @@ ds = ds.roll(lon=int(len(ds['lon']) / 2), roll_coords=True)
 # rename variables as "long_name (unit)"
 ds = ds.rename({k:f"{ds[k].attrs['long_name']} ({ds[k].attrs.get('units', 'unitless')})" for k in sorted(list(ds.keys()), reverse=True)})
 
-if PERSIST_DATA:
-    ds = ds.persist()
+# REMOVED: Global persist call - we'll persist subsets instead
 print ('!!!!!!!!!!1')
 std_parent_dir = Path('/home/mambauser/app/LENS2-ncote-dashboard/data_files/std_dev/')
 files = list(std_parent_dir.glob("*.nc"))
 print (files)
 
-std_ds = xr.open_mfdataset(files, parallel=True)
+std_ds = xr.open_mfdataset(
+    files, 
+    parallel=True,
+    chunks={'time': 12, 'lat': 100, 'lon': 100}  # Added chunk sizes
+)
 std_ds = std_ds.convert_calendar('standard')
 std_ds = std_ds.assign_coords(lon=(((std_ds.lon + 180) % 360) - 180))
 std_ds = std_ds.roll(lon=int(len(std_ds['lon']) / 2), roll_coords=True)
 
 std_ds = std_ds.rename({k:f"{std_ds[k].attrs['long_name']} ({std_ds[k].attrs.get('units', 'unitless')})" for k in sorted(list(std_ds.keys()), reverse=True)})
 
-# rename variables similar to the annual mean dataset
-if PERSIST_DATA:
-    std_ds = std_ds.persist()
+# REMOVED: Global persist call - we'll persist subsets instead
 
 min_year = ds.time.min().dt.year.item()
 max_year = ds.time.max().dt.year.item()
@@ -303,15 +304,25 @@ class ClimateViewer(param.Parameterized):
                     .sel(time=f'{self.year}-01-01', method='nearest') \
                     .sel(forcing_type=self.forcing_type) \
                     .rename({'lat': 'Latitude', 'lon': 'Longitude'})
+        
+        # Persist only the small subset being displayed
+        if PERSIST_DATA:
+            subset = subset.persist()
+        
         subset_hv = hv.Dataset(subset)
-
         self.data_subset = subset_hv
     
     @param.depends('variable', 'forcing_type', 'pointer', watch=True)
     def _get_ts_data(self):
         ts_mean_subset = ds[self.variable].sel(lat=self.pointer[1], lon=self.pointer[0], method='nearest').sel(forcing_type=self.forcing_type).rename({'lat': 'Latitude', 'lon': 'Longitude'})
-        self.ts_mean_subset = hv.Dataset(ts_mean_subset)
         ts_stddev_subset = std_ds[self.variable].sel(lat=self.pointer[1], lon=self.pointer[0], method='nearest').sel(forcing_type=self.forcing_type).rename({'lat': 'Latitude', 'lon': 'Longitude'})
+        
+        # Persist only the small timeseries being displayed
+        if PERSIST_DATA:
+            ts_mean_subset = ts_mean_subset.persist()
+            ts_stddev_subset = ts_stddev_subset.persist()
+        
+        self.ts_mean_subset = hv.Dataset(ts_mean_subset)
         self.ts_upper_bound = hv.Dataset(ts_mean_subset + ts_stddev_subset)
         self.ts_lower_bound = hv.Dataset(ts_mean_subset - ts_stddev_subset)
 
