@@ -28,7 +28,7 @@ print("DEBUG: gv.extension loaded")
 print("DEBUG: Loading hv.extension")
 
 hv.extension('bokeh')
- print("DEBUG: Hv.extension loaded")
+print("DEBUG: Hv.extension loaded")
 
 # plot default style
 opts.defaults(

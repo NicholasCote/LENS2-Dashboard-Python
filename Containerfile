@@ -12,16 +12,19 @@ WORKDIR /home/mambauser/app
 
 RUN chown mambauser:mambauser /home/mambauser/app
 
-# Copy the current directory contents into the container at /usr/src/app
-COPY --chown=mambauser src/cesm-2-dashboard/ environment.yml .
+USER mambauser
 
-# Install any needed packages specified in requirements.yml
+# Copy environment.yml first
+COPY --chown=mambauser src/cesm-2-dashboard/environment.yml .
+
+# Install packages
 RUN micromamba env create -f environment.yml
+
+# Copy application code
+COPY --chown=mambauser src/cesm-2-dashboard/ .
 
 # Activate the environment by providing ENV_NAME as an environment variable at runtime 
 # Make port bokeh application port to the world outside this container
 EXPOSE 5006
-
-USER mambauser
 
 CMD ["panel", "serve", "app.py", "--allow-websocket-origin=*"]
