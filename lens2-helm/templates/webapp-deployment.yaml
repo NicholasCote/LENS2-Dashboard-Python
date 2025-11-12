@@ -22,6 +22,8 @@ spec:
         env:
         - name: ENV_NAME
           value: {{ .Values.webapp.condaEnv }}
+        - name: DASK_CLUSTER_TYPE
+          value: 'scheduler:8786'
         imagePullPolicy: {{ .Values.webapp.container.imagePullPolicy }}
         resources:
           limits:
