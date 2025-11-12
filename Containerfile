@@ -15,7 +15,7 @@ RUN chown mambauser:mambauser /home/mambauser/app
 USER mambauser
 
 # Copy environment.yml first
-COPY --chown=mambauser src/cesm-2-dashboard/environment.yml .
+COPY --chown=mambauser environment.yml .
 
 # Install packages
 RUN micromamba env create -f environment.yml
