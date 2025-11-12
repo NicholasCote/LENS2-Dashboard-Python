@@ -66,12 +66,13 @@ if CLUSTER_TYPE == 'PBSCluster':
 
 elif CLUSTER_TYPE == 'LocalCluster':
     from dask.distributed import LocalCluster
-
+    print("Initializing LocalCluster")
     cluster = LocalCluster(
         'climate-viewer',
         n_workers = 2
     )
     client = Client(cluster)
+    print("Local Cluster Initialized")
 elif CLUSTER_TYPE.startswith('scheduler'):
     client = Client(
         CLUSTER_TYPE,
@@ -80,6 +81,7 @@ elif CLUSTER_TYPE.startswith('scheduler'):
 else:
     raise "Unknown cluster type"
 
+print("Looking to see if Data exists")
 # Try and download the files from Stratus if they don't exist
 # Skip if they do
 data_path = '/home/mambauser/app/LENS2-ncote-dashboard/data_files'
