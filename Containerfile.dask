@@ -10,7 +10,7 @@ RUN mkdir -p /home/mambauser/app
 COPY src/cesm-2-dashboard/prepare.sh /usr/bin/prepare.sh
 COPY src/cesm-2-dashboard/stratus.py /home/mambauser/app
 COPY src/cesm-2-dashboard/get_data.py /home/mambauser/app
-# COPY src/cesm-2-dashboard/LENS2-ncote-dashboard /home/mambauser/app/LENS2-ncote-dashboard
+COPY src/cesm-2-dashboard/LENS2-ncote-dashboard /home/mambauser/app/LENS2-ncote-dashboard
 COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
