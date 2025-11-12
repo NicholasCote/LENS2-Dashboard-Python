@@ -1,0 +1,1 @@
+This folder is present so data files downloaded by get_data.py have a place to live
