@@ -27,7 +27,11 @@ def stratus_s3_client():
             endpoint_url=endpoint,
             config=Config(
                 signature_version=UNSIGNED,
-                s3={'addressing_style': 'path'},  # Use path-style addressing
+                s3={
+                    'addressing_style': 'path',
+                    'payload_signing_enabled': False,
+                    'use_accelerate_endpoint': False,
+                },
                 retries={'max_attempts': 3},
                 connect_timeout=60,
                 read_timeout=60
@@ -97,7 +101,7 @@ def download_file(filename, bucketname):
             return
             
         logger.info(f"Starting download of {filename}")
-        s3_client.download_file(bucketname, filename, filename)
+        s3_client.download_file(bucketname, filename, filename, Config=Config(signature_version=UNSIGNED))
         logger.info(f"Successfully downloaded: {filename}")
     except Exception as e:
         logger.error(f"Failed to download {filename}: {str(e)}")
