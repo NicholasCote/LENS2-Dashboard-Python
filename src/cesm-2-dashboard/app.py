@@ -21,14 +21,8 @@ import xarray as xr
 import hvplot.xarray
 from pathlib import Path
 
-print("DEBUG: Loading gv.extension")
-
 gv.extension('bokeh')
-print("DEBUG: gv.extension loaded")
-print("DEBUG: Loading hv.extension")
-
 hv.extension('bokeh')
-print("DEBUG: Hv.extension loaded")
 
 # plot default style
 opts.defaults(
@@ -45,7 +39,6 @@ CLUSTER_TYPE = os.environ.get('DASK_CLUSTER_TYPE')
 
 # Use LocalCluster if you are not going to build and deploy a Dask cluster
 #CLUSTER_TYPE='LocalCluster'
-
 
 PERSIST_DATA = True
 
@@ -92,7 +85,6 @@ elif CLUSTER_TYPE.startswith('scheduler'):
 else:
     raise "Unknown cluster type"
 
-print("Looking to see if Data exists")
 # Try and download the files from Stratus if they don't exist
 # Skip if they do
 data_path = '/home/mambauser/app/LENS2-ncote-dashboard/data_files'
@@ -106,41 +98,8 @@ parent_dir = Path('/home/mambauser/app/LENS2-ncote-dashboard/data_files/mean/')
 files = list(parent_dir.glob('*.nc'))
 print(*[f.name for f in files], sep=', ') 
 
-print("DEBUG: Checking for data files...")
-data_path = '/home/mambauser/app/LENS2-ncote-dashboard/data_files'
-isExist = os.path.exists(data_path)
-if isExist:
-    print(f"DEBUG: Data path exists: {data_path}")
-else:
-    print(f"DEBUG: Data path doesn't exist, downloading...")
-    get_data_files()
-    print("DEBUG: Download complete")
-
-print("DEBUG: Looking for mean files...")
-parent_dir = Path('/home/mambauser/app/LENS2-ncote-dashboard/data_files/mean/')
-files = list(parent_dir.glob('*.nc'))
-print(f"DEBUG: Found {len(files)} files")
-print(*[f.name for f in files], sep=', ') 
-
-print("DEBUG: Opening mean dataset...")
-try:
-    ds = xr.open_mfdataset(
-        files,
-        parallel=True,
-        chunks={'time': 12, 'lat': 100, 'lon': 100},  # Increased chunk sizes
-        engine='netcdf4',
-        combine='by_coords'
-    )
-except Exception as e:
-    print(f"DEBUG: Error opening dataset: {e}")
-    get_data_files()
-    ds = xr.open_mfdataset(
-        files,
-        parallel=False,  
-        chunks={'time': 12, 'lat': 100, 'lon': 100},  # Increased chunk sizes
-        engine='netcdf4'
-    )
-    
+# Use the working approach - no explicit chunks, let xarray figure it out
+ds = xr.open_mfdataset(files, parallel=True)
 ds = ds.convert_calendar('standard')
 ds = ds.assign_coords(lon=(((ds.lon + 180) % 360) - 180))
 ds = ds.roll(lon=int(len(ds['lon']) / 2), roll_coords=True)
@@ -148,24 +107,25 @@ ds = ds.roll(lon=int(len(ds['lon']) / 2), roll_coords=True)
 # rename variables as "long_name (unit)"
 ds = ds.rename({k:f"{ds[k].attrs['long_name']} ({ds[k].attrs.get('units', 'unitless')})" for k in sorted(list(ds.keys()), reverse=True)})
 
-# REMOVED: Global persist call - we'll persist subsets instead
+# Persist the full dataset after all transformations - this is what worked in the original
+if PERSIST_DATA:
+    ds = ds.persist()
+
 print ('!!!!!!!!!!1')
 std_parent_dir = Path('/home/mambauser/app/LENS2-ncote-dashboard/data_files/std_dev/')
 files = list(std_parent_dir.glob("*.nc"))
 print (files)
 
-std_ds = xr.open_mfdataset(
-    files, 
-    parallel=True,
-    chunks={'time': 12, 'lat': 100, 'lon': 100}  # Added chunk sizes
-)
+std_ds = xr.open_mfdataset(files, parallel=True)
 std_ds = std_ds.convert_calendar('standard')
 std_ds = std_ds.assign_coords(lon=(((std_ds.lon + 180) % 360) - 180))
 std_ds = std_ds.roll(lon=int(len(std_ds['lon']) / 2), roll_coords=True)
 
 std_ds = std_ds.rename({k:f"{std_ds[k].attrs['long_name']} ({std_ds[k].attrs.get('units', 'unitless')})" for k in sorted(list(std_ds.keys()), reverse=True)})
 
-# REMOVED: Global persist call - we'll persist subsets instead
+# Persist the full std_ds after all transformations
+if PERSIST_DATA:
+    std_ds = std_ds.persist()
 
 min_year = ds.time.min().dt.year.item()
 max_year = ds.time.max().dt.year.item()
@@ -334,25 +294,15 @@ class ClimateViewer(param.Parameterized):
                     .sel(time=f'{self.year}-01-01', method='nearest') \
                     .sel(forcing_type=self.forcing_type) \
                     .rename({'lat': 'Latitude', 'lon': 'Longitude'})
-        
-        # Persist only the small subset being displayed
-        if PERSIST_DATA:
-            subset = subset.persist()
-        
         subset_hv = hv.Dataset(subset)
+
         self.data_subset = subset_hv
     
     @param.depends('variable', 'forcing_type', 'pointer', watch=True)
     def _get_ts_data(self):
         ts_mean_subset = ds[self.variable].sel(lat=self.pointer[1], lon=self.pointer[0], method='nearest').sel(forcing_type=self.forcing_type).rename({'lat': 'Latitude', 'lon': 'Longitude'})
-        ts_stddev_subset = std_ds[self.variable].sel(lat=self.pointer[1], lon=self.pointer[0], method='nearest').sel(forcing_type=self.forcing_type).rename({'lat': 'Latitude', 'lon': 'Longitude'})
-        
-        # Persist only the small timeseries being displayed
-        if PERSIST_DATA:
-            ts_mean_subset = ts_mean_subset.persist()
-            ts_stddev_subset = ts_stddev_subset.persist()
-        
         self.ts_mean_subset = hv.Dataset(ts_mean_subset)
+        ts_stddev_subset = std_ds[self.variable].sel(lat=self.pointer[1], lon=self.pointer[0], method='nearest').sel(forcing_type=self.forcing_type).rename({'lat': 'Latitude', 'lon': 'Longitude'})
         self.ts_upper_bound = hv.Dataset(ts_mean_subset + ts_stddev_subset)
         self.ts_lower_bound = hv.Dataset(ts_mean_subset - ts_stddev_subset)
 
