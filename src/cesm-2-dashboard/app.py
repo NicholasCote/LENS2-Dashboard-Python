@@ -64,17 +64,16 @@ if CLUSTER_TYPE == 'PBSCluster':
     client.wait_for_workers(32)
 
 elif CLUSTER_TYPE == 'LocalCluster':
-    from dask.distributed import Client
-    print("DEBUG: Connecting to auto-started cluster...")
+    from dask.distributed import Client, get_client, LocalCluster
+    print("DEBUG: Checking for existing client...")
     try:
-        # Connect to the already-running cluster
-        client = Client(timeout='5s')
-        print(f"DEBUG: Connected to existing cluster: {client}")
-    except Exception as e:
-        print(f"DEBUG: No existing cluster found, creating new one: {e}")
-        from dask.distributed import LocalCluster
+        # This gets the DEFAULT client if one exists globally
+        client = get_client()
+        print(f"DEBUG: Reusing existing client: {client}")
+    except ValueError:  # get_client() raises ValueError if no default client exists
+        print("DEBUG: No existing client, creating new LocalCluster...")
         cluster = LocalCluster(n_workers=2, threads_per_worker=2)
-        client = Client(cluster)
+        client = Client(cluster, set_as_default=True)  # IMPORTANT: set_as_default=True
         print(f"DEBUG: New cluster created: {client}")
 
 elif CLUSTER_TYPE.startswith('scheduler'):
