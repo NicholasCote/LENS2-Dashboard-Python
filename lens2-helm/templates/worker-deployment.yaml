@@ -9,6 +9,7 @@ metadata:
     component: worker
 spec:
   replicas: {{ .Values.worker.replicaCount }}
+  revisionHistoryLimit: 2
   selector:
     matchLabels:
       app: {{ .Values.worker.name }}
@@ -26,6 +27,13 @@ spec:
           - dask
           - worker
           - {{ .Values.scheduler.name }}:{{ .Values.scheduler.container.workerPort }}
+          - --nthreads=4         
+          - --memory-limit=32GB   
+          - --death-timeout=60
+        resources:
+          limits:
+            memory: {{ .Values.worker.container.memory }}
+            cpu: {{ .Values.worker.container.cpu }}
         volumeMounts:
           - mountPath: /home/mambauser/app/src/cesm-2-dashboard/LENS2-ncote-dashboard/data_files/
             name: data-files

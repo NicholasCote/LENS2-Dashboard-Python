@@ -2,6 +2,7 @@ webapp:
   name: negins-lens2-demo
   group: negins-lens2-demo
   condaEnv: lens2
+  ReplicaCount: 3
   autoscale:
     minReplicaCount: 1
     maxReplicaCount: 10
@@ -29,3 +30,5 @@ scheduler:
 worker:
   name: dask-worker
   replicaCount: 4
+  memory: 32G
+  cpu: 4

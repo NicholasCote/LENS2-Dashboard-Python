@@ -8,6 +8,7 @@ metadata:
     group: {{ .Values.webapp.group }}
 spec:
   replicas: {{ .Values.webapp.replicaCount }}
+  revisionHistoryLimit: 2
   selector:
     matchLabels:
       app: {{ .Values.webapp.name }}
