@@ -33,7 +33,7 @@ spec:
         ports:
         - containerPort: {{ .Values.webapp.container.port }}
         volumeMounts:
-          - mountPath: /home/mambauser/app/src/cesm-2-dashboard/LENS2-ncote-dashboard/data_files/
+          - mountPath: LENS2-ncote-dashboard/data_files/
             name: data-files
       volumes:
         - name: data-files
