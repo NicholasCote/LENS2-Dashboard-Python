@@ -13,7 +13,7 @@ webapp:
     fqdn2: cesm-lens2-dashboard.k8s.ucar.edu
     secretName: incommon-cert-negins-lens2-demo
   container: 
-    image: hub.k8s.ucar.edu/ncote/lens2-docker:2025-11-14.21.34
+    image: hub.k8s.ucar.edu/ncote/lens2-docker:2025-11-14.21.57
     imagePullPolicy: Always
     port: 5006
     memory: 16G
@@ -22,7 +22,7 @@ scheduler:
   name: scheduler
   path: /dask-dashboard
   container: 
-    image: hub.k8s.ucar.edu/ncote/dask-lens2:2025-11-14.21.34
+    image: hub.k8s.ucar.edu/ncote/dask-lens2:2025-11-14.21.57
     imagePullPolicy: Always
     dashboardPort: 8787
     workerPort: 8786
