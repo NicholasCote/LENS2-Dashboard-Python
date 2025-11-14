@@ -11,8 +11,8 @@ dask-jobqueue
 datashader
 netcdf4
 h5netcdf
-numpy
-lz4
-boto3==1.34.12
-toolz==1.0.0
+numpy==2.2.4
+lz4==4.4.5
+boto3==1.28.85
+toolz==1.1.0
 jupyter-server-proxy
