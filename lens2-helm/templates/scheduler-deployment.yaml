@@ -32,7 +32,7 @@ spec:
             memory: {{ .Values.scheduler.container.memory }}
             cpu: {{ .Values.scheduler.container.cpu }}
         volumeMounts:
-          - mountPath: /home/mambauser/app/src/cesm-2-dashboard/LENS2-ncote-dashboard/data_files/
+          - mountPath: /home/mambauser/app/LENS2-ncote-dashboard/data_files/
             name: data-files
       volumes:
         - name: data-files

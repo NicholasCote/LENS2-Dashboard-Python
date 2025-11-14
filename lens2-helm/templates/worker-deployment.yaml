@@ -35,7 +35,7 @@ spec:
             memory: {{ .Values.worker.container.memory }}
             cpu: {{ .Values.worker.container.cpu }}
         volumeMounts:
-          - mountPath: /home/mambauser/app/src/cesm-2-dashboard/LENS2-ncote-dashboard/data_files/
+          - mountPath: /home/mambauser/app/LENS2-ncote-dashboard/data_files/
             name: data-files
       volumes:
         - name: data-files
