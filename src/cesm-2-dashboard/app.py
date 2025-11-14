@@ -739,7 +739,7 @@ def create_session():
     pn.state.cache['session_count'] += 1
     
     session_num = pn.state.cache['session_count']
-    print(f">>> New user session #{session_num} created (Session ID: {pn.state.session_id})")
+    print(f">>> New user session #{session_num} created")
     
     # Create a new ClimateViewer instance for this user
     climate_viewer = ClimateViewer()
