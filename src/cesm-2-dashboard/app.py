@@ -186,12 +186,8 @@ variables = list(sorted(ds.keys(), reverse=True))
 forcing_types = list(ds.coords['forcing_type'].values)
 
 DESCRIPTION = pn.pane.HTML("""
-<h1>
-    User Guide
-</h1>
-<h2>
-    Toolbar options:
-</h2>
+<h1>User Guide</h1>
+<h2>Toolbar options:</h2>
 <p class="indent">
     <img src="https://docs.bokeh.org/en/latest/_images/Pan.png" alt=" ">
             PAN: Select to hold and drag the map. <br>
@@ -209,9 +205,7 @@ DESCRIPTION = pn.pane.HTML("""
             RESET: Click to reset to the original values.<br> 
 </p>
                            
-<h2>
-    About Data
-</h2>
+<h2>About Data</h2>
 <p class="indent">
 <p>This interactive dashboard lets users interact with the CESM2 (Community Earth System Model 2) Large Ensemble Community Project (LENS2) climate data developed by a partnership between National Center for Atmospheric Research (NCAR), United States, and the IBS Center for Climate Physics, South Korea. The LENS2 dataset is the result of a computer simulation of Earth system processes based on the past, present and future (1850-2100) climate scenarios. A detailed discussion about the model can be found at <a href="https://www.cesm.ucar.edu/community-projects/lens2">the NCAR's project website.</a> </p>
 <h3>Modeling and Uncertainty: </h3>
@@ -220,7 +214,7 @@ DESCRIPTION = pn.pane.HTML("""
 
 <h2>Monitor App Performance:</h2>
 <p>
-    <a href="https://negins-lens2-demo.k8s.ucar.edu/dask-dashboard/status">Dask Diagnostic UI</a>
+    <a id="dask-dashboard-link" href="/dask-dashboard/status" target="_blank">Dask Diagnostic UI</a>
 </p>
 
 <h2>More Information on Earth System Modeling:</h2>
@@ -229,7 +223,17 @@ DESCRIPTION = pn.pane.HTML("""
     <li><a href="https://www.youtube.com/watch?v=Yd85l5rj0OE">Introduction to the Community Earth System Model (CESM)</a></li>
     <li><a href="https://www.cesm.ucar.edu/community-projects/lens2">CESM2 Large Ensemble Community Project (LENS2)</a></li>
 </p>
-</p>
+
+<script>
+// Auto-detect hostname and update dashboard link
+(function() {
+    var link = document.getElementById('dask-dashboard-link');
+    if (link) {
+        var currentUrl = window.location.protocol + '//' + window.location.host + '/dask-dashboard/status';
+        link.href = currentUrl;
+    }
+})();
+</script>
 """)
 
 class ColorbarControls(Viewer):
