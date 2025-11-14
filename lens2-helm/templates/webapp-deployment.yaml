@@ -39,19 +39,19 @@ spec:
           httpGet:
             path: /
             port: {{ .Values.webapp.container.port }}
-          initialDelaySeconds: 30
-          periodSeconds: 10
-          timeoutSeconds: 5
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 30
           successThreshold: 1
-          failureThreshold: 3
+          failureThreshold: 10
         livenessProbe:
           httpGet:
             path: /
             port: {{ .Values.webapp.container.port }}
-          initialDelaySeconds: 60
-          periodSeconds: 30
-          timeoutSeconds: 10
-          failureThreshold: 3
+          initialDelaySeconds: 120
+          periodSeconds: 60
+          timeoutSeconds: 30
+          failureThreshold: 5
       volumes:
         - name: data-files
           persistentVolumeClaim:
