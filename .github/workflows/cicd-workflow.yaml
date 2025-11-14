@@ -41,7 +41,7 @@ jobs:
           sed -i "/lens2-docker/ c\    image: hub.k8s.ucar.edu/ncote/lens2-docker:${{ steps.date.outputs.date }}" lens2-helm/values.yaml
       - name: Update Helm values.yaml with Dask image
         run: |
-          sed -i "/dask-lens2/ c\    image: hub.k8s.ucar.edu/ncote\/dask-lens2:${{ steps.date.outputs.date }}" lens2-helm/values.yaml
+          sed -i "/dask-lens2/ c\    image: hub.k8s.ucar.edu/ncote/dask-lens2:${{ steps.date.outputs.date }}" lens2-helm/values.yaml
       - name: Update Helm Chart.yaml
         run: |
           sed -i "/appVersion:/ c\appVersion: ${{ steps.date.outputs.date }}" lens2-helm/Chart.yaml
