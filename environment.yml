@@ -18,6 +18,7 @@ dependencies:
   - netcdf4
   - pandas==2.3.3
   - numpy==2.2.4
+  - msgpack==1.1.2
   - python==3.10.12
   - xarray
   - watchfiles

@@ -23,6 +23,14 @@ spec:
         image: {{ .Values.scheduler.container.image }}
         imagePullPolicy: {{ .Values.scheduler.container.imagePullPolicy }}
         args:
-          - dask-worker
+          - dask
+          - worker
           - {{ .Values.scheduler.name }}:{{ .Values.scheduler.container.workerPort }}
+        volumeMounts:
+          - mountPath: /home/mambauser/app/src/cesm-2-dashboard/LENS2-ncote-dashboard/data_files/
+            name: data-files
+      volumes:
+        - name: data-files
+          persistentVolumeClaim:
+            claimName: data-files
     

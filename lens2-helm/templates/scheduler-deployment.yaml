@@ -21,7 +21,8 @@ spec:
         image: {{ .Values.scheduler.container.image }}
         imagePullPolicy: {{ .Values.scheduler.container.imagePullPolicy }}
         args:
-            - dask-scheduler
+            - dask
+            - scheduler
         ports:
           - containerPort: {{ .Values.scheduler.container.workerPort }}
           - containerPort: {{ .Values.scheduler.container.dashboardPort }}
@@ -29,3 +30,10 @@ spec:
           limits:
             memory: {{ .Values.scheduler.container.memory }}
             cpu: {{ .Values.scheduler.container.cpu }}
+        volumeMounts:
+          - mountPath: /home/mambauser/app/src/cesm-2-dashboard/LENS2-ncote-dashboard/data_files/
+            name: data-files
+      volumes:
+        - name: data-files
+          persistentVolumeClaim:
+            claimName: data-files

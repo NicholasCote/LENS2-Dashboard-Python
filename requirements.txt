@@ -15,5 +15,6 @@ numpy==2.2.4
 pandas==2.3.3
 lz4==4.4.5
 boto3==1.28.85
+msgpack==1.1.2
 toolz==1.1.0
 jupyter-server-proxy
