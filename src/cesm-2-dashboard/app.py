@@ -35,10 +35,11 @@ opts.defaults(
 # This is defined by the name we gave the Dask Scheduler Pod in the Helm Chart
 # We can connect to the Dask Scheduler by name and port on K8s since it's in the same Deployment
 # The Dask image should be customized to contain the data & packages needed
-CLUSTER_TYPE = os.environ.get('DASK_CLUSTER_TYPE')
+CLUSTER_TYPE = os.environ.get("DASK_CLUSTER_TYPE")
 
 # Use LocalCluster if you are not going to build and deploy a Dask cluster
 #CLUSTER_TYPE='LocalCluster'
+
 
 PERSIST_DATA = True
 
@@ -64,23 +65,15 @@ if CLUSTER_TYPE == 'PBSCluster':
     client.wait_for_workers(32)
 
 elif CLUSTER_TYPE == 'LocalCluster':
-    from dask.distributed import Client, get_client, LocalCluster
-    print("DEBUG: Checking for existing client...")
-    try:
-        # This gets the DEFAULT client if one exists globally
-        client = get_client()
-        print(f"DEBUG: Reusing existing client: {client}")
-    except ValueError:  # get_client() raises ValueError if no default client exists
-        print("DEBUG: No existing client, creating new LocalCluster...")
-        cluster = LocalCluster(n_workers=2, threads_per_worker=2)
-        client = Client(cluster, set_as_default=True)  # IMPORTANT: set_as_default=True
-        print(f"DEBUG: New cluster created: {client}")
+    from dask.distributed import LocalCluster
 
-elif CLUSTER_TYPE.startswith('scheduler'):
-    client = Client(
-        CLUSTER_TYPE,
-        timeout=3600  # 1 hour timeout
+    cluster = LocalCluster(
+        'climate-viewer',
+        n_workers = 2
     )
+    client = Client(cluster)
+elif CLUSTER_TYPE.startswith('scheduler'):
+    client = Client(CLUSTER_TYPE)
 else:
     raise "Unknown cluster type"
 
@@ -97,7 +90,6 @@ parent_dir = Path('/home/mambauser/app/LENS2-ncote-dashboard/data_files/mean/')
 files = list(parent_dir.glob('*.nc'))
 print(*[f.name for f in files], sep=', ') 
 
-# Use the working approach - no explicit chunks, let xarray figure it out
 ds = xr.open_mfdataset(files, parallel=True)
 ds = ds.convert_calendar('standard')
 ds = ds.assign_coords(lon=(((ds.lon + 180) % 360) - 180))
@@ -106,10 +98,8 @@ ds = ds.roll(lon=int(len(ds['lon']) / 2), roll_coords=True)
 # rename variables as "long_name (unit)"
 ds = ds.rename({k:f"{ds[k].attrs['long_name']} ({ds[k].attrs.get('units', 'unitless')})" for k in sorted(list(ds.keys()), reverse=True)})
 
-# Persist the full dataset after all transformations - this is what worked in the original
 if PERSIST_DATA:
     ds = ds.persist()
-
 print ('!!!!!!!!!!1')
 std_parent_dir = Path('/home/mambauser/app/LENS2-ncote-dashboard/data_files/std_dev/')
 files = list(std_parent_dir.glob("*.nc"))
@@ -122,7 +112,7 @@ std_ds = std_ds.roll(lon=int(len(std_ds['lon']) / 2), roll_coords=True)
 
 std_ds = std_ds.rename({k:f"{std_ds[k].attrs['long_name']} ({std_ds[k].attrs.get('units', 'unitless')})" for k in sorted(list(std_ds.keys()), reverse=True)})
 
-# Persist the full std_ds after all transformations
+# rename variables similar to the annual mean dataset
 if PERSIST_DATA:
     std_ds = std_ds.persist()
 
@@ -168,7 +158,7 @@ DESCRIPTION = pn.pane.HTML("""
 
 <h2>Monitor App Performance:</h2>
 <p>
-    <a href="https://negins-lens2-demo.k8s.ucar.edu/dask-dashboard/status">Dask Diagnostic UI</a>
+    <a href="https://ncote-lens2-demo.k8s.ucar.edu/dask-dashboard/status">Dask Diagnostic UI</a>
 </p>
 
 <h2>More Information on Earth System Modeling:</h2>
