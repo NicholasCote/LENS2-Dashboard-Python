@@ -93,31 +93,99 @@ parent_dir = Path('/home/mambauser/app/LENS2-ncote-dashboard/data_files/mean/')
 files = list(parent_dir.glob('*.nc'))
 print(*[f.name for f in files], sep=', ') 
 
-ds = xr.open_mfdataset(files, parallel=True)
+# ============= FIRST DATASET (mean) =============
+print("=" * 60)
+print("Loading MEAN dataset")
+parent_dir = Path('/home/mambauser/app/LENS2-ncote-dashboard/data_files/mean/')
+files = list(parent_dir.glob('*.nc'))
+print(f"Found {len(files)} files")
+
+# Debug: Check file sizes
+total_size_gb = sum(f.stat().st_size for f in files) / (1024**3)
+print(f"Total file size: {total_size_gb:.2f} GB")
+print(f"Average file size: {total_size_gb/len(files):.2f} GB")
+
+# Check one file's structure
+print("\nInspecting first file structure...")
+with xr.open_dataset(files[0]) as sample:
+    print(f"  Dimensions: {dict(sample.dims)}")
+    print(f"  Coordinates: {list(sample.coords)}")
+    print(f"  Variables: {list(sample.data_vars)}")
+    
+    # Check actual grid size
+    lat_size = sample.dims.get('lat', sample.dims.get('latitude', 'unknown'))
+    lon_size = sample.dims.get('lon', sample.dims.get('longitude', 'unknown'))
+    time_size = sample.dims.get('time', 'unknown')
+    print(f"  Grid: time={time_size}, lat={lat_size}, lon={lon_size}")
+
+# Now load with proper chunking
+print("\nOpening all files with chunking...")
+ds = xr.open_mfdataset(
+    files, 
+    parallel=True,
+    chunks={'time': 1},  # Chunk by time - adjust based on output above
+    engine='netcdf4',
+    combine='by_coords',
+    compat='override'
+)
+print(f"✓ Dataset opened (lazy): {ds.dims}")
+print(f"  Data is chunked: {type(ds[list(ds.data_vars)[0]].data)}")
+
 ds = ds.convert_calendar('standard')
 ds = ds.assign_coords(lon=(((ds.lon + 180) % 360) - 180))
 ds = ds.roll(lon=int(len(ds['lon']) / 2), roll_coords=True)
 
-# rename variables as "long_name (unit)"
+# rename variables
 ds = ds.rename({k:f"{ds[k].attrs['long_name']} ({ds[k].attrs.get('units', 'unitless')})" for k in sorted(list(ds.keys()), reverse=True)})
+print(f"✓ Dataset transformed")
 
+# DON'T persist yet - keep lazy until we know it works
 if PERSIST_DATA:
+    print("Persisting mean dataset to workers...")
+    print(f"  Current memory usage: {sum(w['memory'] for w in client.scheduler_info()['workers'].values()) / 1e9:.2f} GB")
     ds = ds.persist()
-print ('!!!!!!!!!!1')
+    # Wait for persist to complete
+    import dask
+    dask.distributed.wait(ds)
+    print(f"✓ Persisted. New memory usage: {sum(w['memory'] for w in client.scheduler_info()['workers'].values()) / 1e9:.2f} GB")
+
+# ============= SECOND DATASET (std_dev) =============
+print("=" * 60)
+print("Loading STD_DEV dataset")
 std_parent_dir = Path('/home/mambauser/app/LENS2-ncote-dashboard/data_files/std_dev/')
 files = list(std_parent_dir.glob("*.nc"))
-print (files)
+print(f"Found {len(files)} files")
 
-std_ds = xr.open_mfdataset(files, parallel=True)
+total_size_gb = sum(f.stat().st_size for f in files) / (1024**3)
+print(f"Total file size: {total_size_gb:.2f} GB")
+
+print("Opening all files with chunking...")
+std_ds = xr.open_mfdataset(
+    files, 
+    parallel=True,
+    chunks={'time': 1},  # Same chunking strategy
+    engine='netcdf4',
+    combine='by_coords',
+    compat='override'
+)
+print(f"✓ Dataset opened (lazy): {std_ds.dims}")
+
 std_ds = std_ds.convert_calendar('standard')
 std_ds = std_ds.assign_coords(lon=(((std_ds.lon + 180) % 360) - 180))
 std_ds = std_ds.roll(lon=int(len(std_ds['lon']) / 2), roll_coords=True)
 
 std_ds = std_ds.rename({k:f"{std_ds[k].attrs['long_name']} ({std_ds[k].attrs.get('units', 'unitless')})" for k in sorted(list(std_ds.keys()), reverse=True)})
+print(f"✓ Dataset transformed")
 
-# rename variables similar to the annual mean dataset
 if PERSIST_DATA:
+    print("Persisting std_dev dataset to workers...")
+    print(f"  Current memory usage: {sum(w['memory'] for w in client.scheduler_info()['workers'].values()) / 1e9:.2f} GB")
     std_ds = std_ds.persist()
+    dask.distributed.wait(std_ds)
+    print(f"✓ Persisted. New memory usage: {sum(w['memory'] for w in client.scheduler_info()['workers'].values()) / 1e9:.2f} GB")
+
+print("=" * 60)
+print("Both datasets loaded successfully!")
 
 min_year = ds.time.min().dt.year.item()
 max_year = ds.time.max().dt.year.item()
