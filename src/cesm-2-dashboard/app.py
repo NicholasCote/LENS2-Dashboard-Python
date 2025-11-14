@@ -71,7 +71,7 @@ elif CLUSTER_TYPE == 'LocalCluster':
         n_workers = 2
     )
     client = Client(cluster)
-    
+
 elif CLUSTER_TYPE.startswith('scheduler'):
     client = Client(CLUSTER_TYPE)
 else:
@@ -79,11 +79,14 @@ else:
 
 # Try and download the files from Stratus if they don't exist
 # Skip if they do
+print("Checking for Data")
 data_path = '/home/mambauser/app/LENS2-ncote-dashboard/data_files'
 isExist = os.path.exists(data_path)
 if isExist:
+    print("Data exists")
     pass
 else:
+    print("Data does not exist. Downloading files")
     get_data_files()
 
 parent_dir = Path('/home/mambauser/app/LENS2-ncote-dashboard/data_files/mean/')
