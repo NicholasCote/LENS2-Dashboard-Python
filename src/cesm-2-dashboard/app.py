@@ -6,6 +6,7 @@ import param
 from datetime import datetime
 from stratus import get_data_files
 import os
+import time
 
 from dask.distributed import Client
 import dask
@@ -13,7 +14,6 @@ from holoviews.operation.datashader import rasterize
 from holoviews import opts, streams
 from panel.viewable import Viewer
 import geoviews.feature as gf
-import param
 from cartopy import crs
 from bokeh.models.formatters import PrintfTickFormatter
 
@@ -21,8 +21,14 @@ import xarray as xr
 import hvplot.xarray
 from pathlib import Path
 
+# ============================================================================
+# BOKEH/HOLOVIEWS CONFIGURATION (runs once at import)
+# ============================================================================
 gv.extension('bokeh')
 hv.extension('bokeh')
+
+# Set HDF5 locking before any file operations
+os.environ['HDF5_USE_FILE_LOCKING'] = 'FALSE'
 
 # plot default style
 opts.defaults(
@@ -32,158 +38,240 @@ opts.defaults(
     )
 )
 
-# This is defined by the name we gave the Dask Scheduler Pod in the Helm Chart
-# We can connect to the Dask Scheduler by name and port on K8s since it's in the same Deployment
-# The Dask image should be customized to contain the data & packages needed
-#CLUSTER_TYPE = 'scheduler:8786'
+# ============================================================================
+# GLOBAL INITIALIZATION FUNCTIONS (run once per app instance)
+# ============================================================================
 
-# Use LocalCluster if you are not going to build and deploy a Dask cluster
-CLUSTER_TYPE=os.environ.get("DASK_CLUSTER_TYPE")
+def get_or_create_dask_client():
+    """
+    Get or create a singleton Dask client.
+    This ensures only one connection is made regardless of how many users connect.
+    """
+    # Check if client already exists in Panel's cache
+    if 'dask_client' in pn.state.cache:
+        print("Using existing Dask client from cache")
+        return pn.state.cache['dask_client']
+    
+    CLUSTER_TYPE = os.environ.get("DASK_CLUSTER_TYPE")
+    PERSIST_DATA = os.environ.get("PERSIST_DATA", "true").lower() == "true"
+    
+    print(f"Initializing new Dask client: CLUSTER_TYPE = {CLUSTER_TYPE}")
+    
+    if CLUSTER_TYPE == 'PBSCluster':
+        from dask_jobqueue import PBSCluster
+        cluster = PBSCluster(
+            job_name='climate-viewer',
+            cores=1,
+            memory='4GiB',
+            processes=4,
+            local_directory='/glade/work/pdas47/scratch/pbs.$PBS_JOBID/dask/spill',
+            resource_spec='select=1:ncpus=1:mem=4GB',
+            queue='casper',
+            walltime='01:00:00',
+            interface='ib0',
+            worker_extra_args=["--lifetime", "25m", "--lifetime-stagger", "4m"]
+        )
+        cluster.scale(32)
+        client = Client(cluster)
+        client.wait_for_workers(32)
+    
+    elif CLUSTER_TYPE == 'LocalCluster':
+        from dask.distributed import LocalCluster
+        cluster = LocalCluster(
+            n_workers=2,
+            threads_per_worker=4,
+            memory_limit='8GB'
+        )
+        client = Client(cluster)
+    
+    elif CLUSTER_TYPE.startswith('scheduler'):
+        max_retries = 5
+        retry_delay = 2
+        
+        for attempt in range(max_retries):
+            try:
+                print(f"Attempting to connect to Dask scheduler at {CLUSTER_TYPE} (attempt {attempt + 1}/{max_retries})...")
+                client = Client(CLUSTER_TYPE, timeout='10s')
+                print(f"✓ Connected to Dask scheduler")
+                
+                # Wait for at least 1 worker to be available
+                print("Waiting for Dask workers to be available...")
+                workers_available = False
+                for wait_attempt in range(30):
+                    workers = client.scheduler_info().get('workers', {})
+                    if len(workers) > 0:
+                        print(f"✓ {len(workers)} Dask worker(s) available")
+                        workers_available = True
+                        break
+                    print(f"  No workers yet, waiting... ({wait_attempt + 1}/30)")
+                    time.sleep(2)
+                
+                if not workers_available:
+                    print("WARNING: No Dask workers available yet. Proceeding without workers.")
+                    pn.state.cache['persist_data'] = False
+                else:
+                    pn.state.cache['persist_data'] = PERSIST_DATA
+                
+                break  # Successfully connected
+            
+            except Exception as e:
+                print(f"✗ Failed to connect to Dask scheduler: {e}")
+                if attempt < max_retries - 1:
+                    print(f"  Retrying in {retry_delay} seconds...")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                else:
+                    print("✗ Could not connect to Dask scheduler after all retries")
+                    raise RuntimeError(f"Failed to connect to Dask scheduler at {CLUSTER_TYPE}")
+    else:
+        raise RuntimeError(f"Unknown cluster type: {CLUSTER_TYPE}")
+    
+    # Cache the client
+    pn.state.cache['dask_client'] = client
+    print("✓ Dask client cached for reuse")
+    
+    return client
 
-PERSIST_DATA = True
 
-print(f"{CLUSTER_TYPE = }")
-
-if CLUSTER_TYPE == 'PBSCluster':
-    from dask_jobqueue import PBSCluster
-
-    cluster = PBSCluster(
-        job_name = 'climate-viewer',
-        cores = 1,
-        memory = '4GiB',
-        processes = 4,
-        local_directory = '/glade/work/pdas47/scratch/pbs.$PBS_JOBID/dask/spill',
-        resource_spec = 'select=1:ncpus=1:mem=4GB',
-        queue = 'casper',
-        walltime = '01:00:00',
-        interface = 'ib0',
-        worker_extra_args = ["--lifetime", "25m", "--lifetime-stagger", "4m"]
+def load_datasets_once():
+    """
+    Load datasets once and cache them for all sessions.
+    This is the expensive operation we want to do only once.
+    """
+    # Check if already loaded
+    if 'datasets_loaded' in pn.state.cache:
+        print("✓ Using cached datasets (already loaded)")
+        return pn.state.cache['ds'], pn.state.cache['std_ds']
+    
+    print("=" * 70)
+    print("LOADING DATASETS FOR THE FIRST TIME (this happens once per app)")
+    print("=" * 70)
+    
+    # Get Dask client
+    client = get_or_create_dask_client()
+    PERSIST_DATA = pn.state.cache.get('persist_data', True)
+    
+    # Download files if needed
+    data_path = '/home/mambauser/app/LENS2-ncote-dashboard/data_files'
+    if not os.path.exists(data_path):
+        print("Downloading data files...")
+        get_data_files()
+    
+    # ========== Load mean dataset ==========
+    print("\nLoading MEAN dataset...")
+    parent_dir = Path('/home/mambauser/app/LENS2-ncote-dashboard/data_files/mean/')
+    files = list(parent_dir.glob('*.nc'))
+    print(f"  Found {len(files)} files: {', '.join(f.name for f in files)}")
+    
+    ds = xr.open_mfdataset(
+        files,
+        parallel=False,  # Avoid HDF5 locking issues on shared storage
+        chunks={'time': 1},
+        engine='netcdf4',
+        combine='by_coords'
     )
-    cluster.scale(32)
-    client = Client(cluster)
-    client.wait_for_workers(32)
-
-elif CLUSTER_TYPE == 'LocalCluster':
-    from dask.distributed import LocalCluster
-
-    cluster = LocalCluster(
-        'climate-viewer',
-        n_workers = 2
+    
+    ds = ds.convert_calendar('standard')
+    ds = ds.assign_coords(lon=(((ds.lon + 180) % 360) - 180))
+    ds = ds.roll(lon=int(len(ds['lon']) / 2), roll_coords=True)
+    ds = ds.rename({
+        k: f"{ds[k].attrs['long_name']} ({ds[k].attrs.get('units', 'unitless')})"
+        for k in sorted(list(ds.keys()), reverse=True)
+    })
+    print("  ✓ Mean dataset opened and transformed")
+    
+    # ========== Load std_dev dataset ==========
+    print("\nLoading STD_DEV dataset...")
+    std_parent_dir = Path('/home/mambauser/app/LENS2-ncote-dashboard/data_files/std_dev/')
+    std_files = list(std_parent_dir.glob("*.nc"))
+    print(f"  Found {len(std_files)} files")
+    
+    std_ds = xr.open_mfdataset(
+        std_files,
+        parallel=False,
+        chunks={'time': 1},
+        engine='netcdf4',
+        combine='by_coords'
     )
-    client = Client(cluster)
-elif CLUSTER_TYPE.startswith('scheduler'):
-    import time
-    max_retries = 5
-    retry_delay = 2
-    for attempt in range(max_retries):
+    
+    std_ds = std_ds.convert_calendar('standard')
+    std_ds = std_ds.assign_coords(lon=(((std_ds.lon + 180) % 360) - 180))
+    std_ds = std_ds.roll(lon=int(len(std_ds['lon']) / 2), roll_coords=True)
+    std_ds = std_ds.rename({
+        k: f"{std_ds[k].attrs['long_name']} ({std_ds[k].attrs.get('units', 'unitless')})"
+        for k in sorted(list(std_ds.keys()), reverse=True)
+    })
+    print("  ✓ Std_dev dataset opened and transformed")
+    
+    # ========== Persist if enabled ==========
+    if PERSIST_DATA:
+        print("\nPersisting datasets to Dask workers...")
         try:
-            print(f"Attempting to connect to Dask scheduler at {CLUSTER_TYPE} (attempt {attempt + 1}/{max_retries})...")
-            client = Client(CLUSTER_TYPE, timeout='10s')
-            print(f"✓ Connected to Dask scheduler")
-            # Wait for at least 1 worker to be available
-            print("Waiting for Dask workers to be available...")
-            workers_available = False
-            for wait_attempt in range(30):  # Wait up to 60 seconds
-                workers = client.scheduler_info().get('workers', {})
-                if len(workers) > 0:
-                    print(f"✓ {len(workers)} Dask worker(s) available")
-                    workers_available = True
-                    break
-                print(f"  No workers yet, waiting... ({wait_attempt + 1}/30)")
-                time.sleep(2)
-            if not workers_available:
-                print("WARNING: No Dask workers available yet. Proceeding without persistence.")
-                PERSIST_DATA = False
-            break  # Successfully connected
-        except Exception as e:
-            print(f"✗ Failed to connect to Dask scheduler: {e}")
-            if attempt < max_retries - 1:
-                print(f"  Retrying in {retry_delay} seconds...")
-                time.sleep(retry_delay)
-                retry_delay *= 2  # Exponential backoff
+            workers_info = client.scheduler_info()['workers']
+            if workers_info:
+                mem_before = sum(w['memory'] for w in workers_info.values()) / 1e9
+                print(f"  Memory before persist: {mem_before:.2f} GB")
+            
+            # Persist both datasets
+            ds = ds.persist()
+            std_ds = std_ds.persist()
+            
+            # Wait for persistence to complete
+            print("  Waiting for persistence to complete...")
+            dask.distributed.wait([ds, std_ds], timeout=120)
+            
+            workers_info = client.scheduler_info()['workers']
+            if workers_info:
+                mem_after = sum(w['memory'] for w in workers_info.values()) / 1e9
+                print(f"  Memory after persist: {mem_after:.2f} GB")
+                print(f"  ✓ Datasets persisted ({mem_after - mem_before:.2f} GB used)")
             else:
-                print("✗ Could not connect to Dask scheduler after all retries")
-                raise RuntimeError(f"Failed to connect to Dask scheduler at {CLUSTER_TYPE}")
-else:
-    raise RuntimeError("Unknown cluster type")
+                print("  ✓ Datasets persisted")
+        
+        except Exception as e:
+            print(f"  ⚠ Warning: Failed to persist datasets: {e}")
+            print("  Continuing with lazy loading (data will be computed on-demand)")
+    else:
+        print("\nPersistence disabled - using lazy loading")
+    
+    # Cache the datasets
+    pn.state.cache['ds'] = ds
+    pn.state.cache['std_ds'] = std_ds
+    pn.state.cache['datasets_loaded'] = True
+    
+    print("\n" + "=" * 70)
+    print("✓ DATASETS LOADED AND CACHED - subsequent sessions will be instant")
+    print("=" * 70 + "\n")
+    
+    return ds, std_ds
 
-# Try and download the files from Stratus if they don't exist
-# Skip if they do
-data_path = '/home/mambauser/app/LENS2-ncote-dashboard/data_files'
-isExist = os.path.exists(data_path)
-if isExist:
-    pass
-else:
-    get_data_files()
 
-parent_dir = Path('/home/mambauser/app/LENS2-ncote-dashboard/data_files/mean/')
-files = list(parent_dir.glob('*.nc'))
-print(*[f.name for f in files], sep=', ') 
+# ============================================================================
+# LOAD DATASETS AT MODULE LEVEL (happens once when app starts)
+# ============================================================================
 
-ds = xr.open_mfdataset(files, parallel=False)
-ds = ds.convert_calendar('standard')
-ds = ds.assign_coords(lon=(((ds.lon + 180) % 360) - 180))
-ds = ds.roll(lon=int(len(ds['lon']) / 2), roll_coords=True)
+print("Initializing CESM2 LENS2 Dashboard...")
+try:
+    ds, std_ds = load_datasets_once()
+except Exception as e:
+    print(f"✗ FATAL ERROR during initial data load: {e}")
+    raise
 
-# rename variables as "long_name (unit)"
-ds = ds.rename({k:f"{ds[k].attrs['long_name']} ({ds[k].attrs.get('units', 'unitless')})" for k in sorted(list(ds.keys()), reverse=True)})
-
-if PERSIST_DATA:
-    try:
-        print("Persisting mean dataset to workers...")
-        workers_info = client.scheduler_info()['workers']
-        if workers_info:
-            print(f"  Current memory usage: {sum(w['memory'] for w in workers_info.values()) / 1e9:.2f} GB")
-        ds = ds.persist()
-        # Wait for persist to complete with timeout
-        import dask
-        print("  Waiting for persistence to complete...")
-        dask.distributed.wait(ds, timeout=120)  # 2 minute timeout
-        workers_info = client.scheduler_info()['workers']
-        if workers_info:
-            print(f"✓ Persisted. New memory usage: {sum(w['memory'] for w in workers_info.values()) / 1e9:.2f} GB")
-        else:
-            print("✓ Persisted (worker memory info unavailable)")
-    except Exception as e:
-        print(f"⚠ Warning: Failed to persist mean dataset: {e}")
-        print("  Continuing with lazy loading (data will be computed on-demand)")
-
-std_parent_dir = Path('/home/mambauser/app/LENS2-ncote-dashboard/data_files/std_dev/')
-files = list(std_parent_dir.glob("*.nc"))
-print (files)
-
-std_ds = xr.open_mfdataset(files, parallel=False)
-std_ds = std_ds.convert_calendar('standard')
-std_ds = std_ds.assign_coords(lon=(((std_ds.lon + 180) % 360) - 180))
-std_ds = std_ds.roll(lon=int(len(std_ds['lon']) / 2), roll_coords=True)
-
-std_ds = std_ds.rename({k:f"{std_ds[k].attrs['long_name']} ({std_ds[k].attrs.get('units', 'unitless')})" for k in sorted(list(std_ds.keys()), reverse=True)})
-
-# rename variables similar to the annual mean dataset
-if PERSIST_DATA:
-    try:
-        print("Persisting std_dev dataset to workers...")
-        workers_info = client.scheduler_info()['workers']
-        if workers_info:
-            print(f"  Current memory usage: {sum(w['memory'] for w in workers_info.values()) / 1e9:.2f} GB")
-        std_ds = std_ds.persist()
-        print("  Waiting for persistence to complete...")
-        dask.distributed.wait(std_ds, timeout=120)  # 2 minute timeout
-        workers_info = client.scheduler_info()['workers']
-        if workers_info:
-            print(f"✓ Persisted. New memory usage: {sum(w['memory'] for w in workers_info.values()) / 1e9:.2f} GB")
-        else:
-            print("✓ Persisted (worker memory info unavailable)")
-    except Exception as e:
-        print(f"⚠ Warning: Failed to persist std_dev dataset: {e}")
-        print("  Continuing with lazy loading (data will be computed on-demand)")
-
+# Extract metadata from loaded datasets
 min_year = ds.time.min().dt.year.item()
 max_year = ds.time.max().dt.year.item()
-
 variables = list(sorted(ds.keys(), reverse=True))
-
 forcing_types = list(ds.coords['forcing_type'].values)
+
+print(f"Dataset metadata extracted:")
+print(f"  Years: {min_year} - {max_year}")
+print(f"  Variables: {len(variables)}")
+print(f"  Forcing types: {len(forcing_types)}")
+print("✓ Dashboard ready to accept connections\n")
+
+# ============================================================================
+# STATIC HTML DESCRIPTION
+# ============================================================================
 
 DESCRIPTION = pn.pane.HTML("""
 <h1>User Guide</h1>
@@ -235,6 +323,10 @@ DESCRIPTION = pn.pane.HTML("""
 })();
 </script>
 """)
+
+# ============================================================================
+# PER-SESSION CLASSES (created once per user)
+# ============================================================================
 
 class ColorbarControls(Viewer):
     clim = param.Range(default=(0, 100), label="Colorbar Range")
@@ -385,7 +477,6 @@ class ClimateViewer(param.Parameterized):
             self.cbar_controls.clim = clim_range
 
         if not self._selection.bounds == (0, 0, 0, 0):
-            print("plotting selected")
             plot_selection = gv.Image(
                 data = self.selected,
                 kdims = ['Longitude', 'Latitude'],
@@ -495,7 +586,6 @@ class ClimateViewer(param.Parameterized):
         if self.ts_hv is None:
             return
 
-        print(self.show_ts_legend)
         self.ts_hv = self.ts_hv.opts(
             opts.Curve(
                 show_legend=self.show_ts_legend, 
@@ -632,8 +722,31 @@ class ClimateViewer(param.Parameterized):
         )
 
         return template
-    
-climate_viewer = ClimateViewer()
 
-template = climate_viewer.template
+
+# ============================================================================
+# PER-SESSION INITIALIZATION (runs once per user connection)
+# ============================================================================
+
+def create_session():
+    """
+    Create a new viewer instance for each user session.
+    This is fast because data is already loaded and cached.
+    """
+    # Track session creation
+    if 'session_count' not in pn.state.cache:
+        pn.state.cache['session_count'] = 0
+    pn.state.cache['session_count'] += 1
+    
+    session_num = pn.state.cache['session_count']
+    print(f">>> New user session #{session_num} created (Session ID: {pn.state.session_id})")
+    
+    # Create a new ClimateViewer instance for this user
+    climate_viewer = ClimateViewer()
+    
+    return climate_viewer.template
+
+
+# Create the template (this runs once per user)
+template = create_session()
 template.servable()
