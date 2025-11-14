@@ -22,6 +22,22 @@ import hvplot.xarray
 from pathlib import Path
 
 # ============================================================================
+# HEALTH CHECK ENDPOINT FOR READINESS/LIVENESS PROBES
+# ============================================================================
+@pn.depends()
+def health_check():
+    """Lightweight health check endpoint"""
+    return "OK"
+
+# Register the health endpoint
+pn.serve(
+    {
+        '/health': health_check
+    },
+    show=False
+)
+
+# ============================================================================
 # BOKEH/HOLOVIEWS CONFIGURATION (runs once at import)
 # ============================================================================
 gv.extension('bokeh')
