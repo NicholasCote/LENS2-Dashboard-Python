@@ -120,7 +120,7 @@ parent_dir = Path('/home/mambauser/app/LENS2-ncote-dashboard/data_files/mean/')
 files = list(parent_dir.glob('*.nc'))
 print(*[f.name for f in files], sep=', ') 
 
-ds = xr.open_mfdataset(files, parallel=True)
+ds = xr.open_mfdataset(files, parallel=False)
 ds = ds.convert_calendar('standard')
 ds = ds.assign_coords(lon=(((ds.lon + 180) % 360) - 180))
 ds = ds.roll(lon=int(len(ds['lon']) / 2), roll_coords=True)
@@ -152,7 +152,7 @@ std_parent_dir = Path('/home/mambauser/app/LENS2-ncote-dashboard/data_files/std_
 files = list(std_parent_dir.glob("*.nc"))
 print (files)
 
-std_ds = xr.open_mfdataset(files, parallel=True)
+std_ds = xr.open_mfdataset(files, parallel=False)
 std_ds = std_ds.convert_calendar('standard')
 std_ds = std_ds.assign_coords(lon=(((std_ds.lon + 180) % 360) - 180))
 std_ds = std_ds.roll(lon=int(len(std_ds['lon']) / 2), roll_coords=True)
