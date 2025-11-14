@@ -72,9 +72,40 @@ elif CLUSTER_TYPE == 'LocalCluster':
     )
     client = Client(cluster)
 elif CLUSTER_TYPE.startswith('scheduler'):
-    client = Client(CLUSTER_TYPE)
+    import time
+    max_retries = 5
+    retry_delay = 2
+    for attempt in range(max_retries):
+        try:
+            print(f"Attempting to connect to Dask scheduler at {CLUSTER_TYPE} (attempt {attempt + 1}/{max_retries})...")
+            client = Client(CLUSTER_TYPE, timeout='10s')
+            print(f"✓ Connected to Dask scheduler")
+            # Wait for at least 1 worker to be available
+            print("Waiting for Dask workers to be available...")
+            workers_available = False
+            for wait_attempt in range(30):  # Wait up to 60 seconds
+                workers = client.scheduler_info().get('workers', {})
+                if len(workers) > 0:
+                    print(f"✓ {len(workers)} Dask worker(s) available")
+                    workers_available = True
+                    break
+                print(f"  No workers yet, waiting... ({wait_attempt + 1}/30)")
+                time.sleep(2)
+            if not workers_available:
+                print("WARNING: No Dask workers available yet. Proceeding without persistence.")
+                PERSIST_DATA = False
+            break  # Successfully connected
+        except Exception as e:
+            print(f"✗ Failed to connect to Dask scheduler: {e}")
+            if attempt < max_retries - 1:
+                print(f"  Retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+            else:
+                print("✗ Could not connect to Dask scheduler after all retries")
+                raise RuntimeError(f"Failed to connect to Dask scheduler at {CLUSTER_TYPE}")
 else:
-    raise "Unknown cluster type"
+    raise RuntimeError("Unknown cluster type")
 
 # Try and download the files from Stratus if they don't exist
 # Skip if they do
@@ -98,8 +129,25 @@ ds = ds.roll(lon=int(len(ds['lon']) / 2), roll_coords=True)
 ds = ds.rename({k:f"{ds[k].attrs['long_name']} ({ds[k].attrs.get('units', 'unitless')})" for k in sorted(list(ds.keys()), reverse=True)})
 
 if PERSIST_DATA:
-    ds = ds.persist()
-print ('!!!!!!!!!!1')
+    try:
+        print("Persisting mean dataset to workers...")
+        workers_info = client.scheduler_info()['workers']
+        if workers_info:
+            print(f"  Current memory usage: {sum(w['memory'] for w in workers_info.values()) / 1e9:.2f} GB")
+        ds = ds.persist()
+        # Wait for persist to complete with timeout
+        import dask
+        print("  Waiting for persistence to complete...")
+        dask.distributed.wait(ds, timeout=120)  # 2 minute timeout
+        workers_info = client.scheduler_info()['workers']
+        if workers_info:
+            print(f"✓ Persisted. New memory usage: {sum(w['memory'] for w in workers_info.values()) / 1e9:.2f} GB")
+        else:
+            print("✓ Persisted (worker memory info unavailable)")
+    except Exception as e:
+        print(f"⚠ Warning: Failed to persist mean dataset: {e}")
+        print("  Continuing with lazy loading (data will be computed on-demand)")
+
 std_parent_dir = Path('/home/mambauser/app/LENS2-ncote-dashboard/data_files/std_dev/')
 files = list(std_parent_dir.glob("*.nc"))
 print (files)
@@ -113,7 +161,22 @@ std_ds = std_ds.rename({k:f"{std_ds[k].attrs['long_name']} ({std_ds[k].attrs.get
 
 # rename variables similar to the annual mean dataset
 if PERSIST_DATA:
-    std_ds = std_ds.persist()
+    try:
+        print("Persisting std_dev dataset to workers...")
+        workers_info = client.scheduler_info()['workers']
+        if workers_info:
+            print(f"  Current memory usage: {sum(w['memory'] for w in workers_info.values()) / 1e9:.2f} GB")
+        std_ds = std_ds.persist()
+        print("  Waiting for persistence to complete...")
+        dask.distributed.wait(std_ds, timeout=120)  # 2 minute timeout
+        workers_info = client.scheduler_info()['workers']
+        if workers_info:
+            print(f"✓ Persisted. New memory usage: {sum(w['memory'] for w in workers_info.values()) / 1e9:.2f} GB")
+        else:
+            print("✓ Persisted (worker memory info unavailable)")
+    except Exception as e:
+        print(f"⚠ Warning: Failed to persist std_dev dataset: {e}")
+        print("  Continuing with lazy loading (data will be computed on-demand)")
 
 min_year = ds.time.min().dt.year.item()
 max_year = ds.time.max().dt.year.item()
@@ -157,7 +220,7 @@ DESCRIPTION = pn.pane.HTML("""
 
 <h2>Monitor App Performance:</h2>
 <p>
-    <a href="https://ncote-lens2-demo.k8s.ucar.edu/dask-dashboard/status">Dask Diagnostic UI</a>
+    <a href="https://negins-lens2-demo.k8s.ucar.edu/dask-dashboard/status">Dask Diagnostic UI</a>
 </p>
 
 <h2>More Information on Earth System Modeling:</h2>
