@@ -30,5 +30,6 @@ scheduler:
 worker:
   name: dask-worker
   replicaCount: 4
-  memory: 32G
-  cpu: 4
+  container: 
+    memory: 32G
+    cpu: 4
