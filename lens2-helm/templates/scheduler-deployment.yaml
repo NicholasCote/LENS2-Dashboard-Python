@@ -21,8 +21,7 @@ spec:
         image: {{ .Values.scheduler.container.image }}
         imagePullPolicy: {{ .Values.scheduler.container.imagePullPolicy }}
         args:
-            - dask
-            - scheduler
+            - dask-scheduler
         ports:
           - containerPort: {{ .Values.scheduler.container.workerPort }}
           - containerPort: {{ .Values.scheduler.container.dashboardPort }}
