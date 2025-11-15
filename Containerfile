@@ -22,9 +22,9 @@ RUN micromamba install -y -n base -c conda-forge --file environment.yml && \
 
 # Pre-download cartopy data - use micromamba run to activate environment
 RUN micromamba run -n base python -c "\
-    import cartopy.io.shapereader as shpreader; \
-    shpreader.natural_earth(resolution='110m', category='physical', name='coastline'); \
-    print('✓ Cartopy data downloaded')"
+import cartopy.io.shapereader as shpreader; \
+shpreader.natural_earth(resolution='110m', category='physical', name='coastline'); \
+print('✓ Cartopy data downloaded')"
 
 # Copy application code
 COPY --chown=mambauser src/cesm-2-dashboard/ .
