@@ -2,9 +2,6 @@ FROM ghcr.io/dask/dask:latest
 
 USER root
 WORKDIR /home/mambauser/app
-RUN chown mambauser:mambauser /home/mambauser/app
-
-USER mambauser
 
 # Use mamba, not pip
 RUN mamba install -y -c conda-forge \
