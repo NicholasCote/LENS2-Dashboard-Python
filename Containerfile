@@ -9,10 +9,9 @@ RUN mamba env update -n base -f environment.yml && \
     mamba clean --all -y
 
 # Pre-download cartopy data into lens2 environment
-RUN mamba run -n lens2 python -c "\
-import cartopy.io.shapereader as shpreader; \
-shpreader.natural_earth(resolution='110m', category='physical', name='coastline'); \
-print('✓ Cartopy coastline data downloaded')"
+RUN python -c "import cartopy.io.shapereader as shpreader; \
+    shpreader.natural_earth(resolution='110m', category='physical', name='coastline'); \
+    print('✓ Cartopy coastline data downloaded')"
 
 COPY --chown=mambauser src/cesm-2-dashboard/ .
 
