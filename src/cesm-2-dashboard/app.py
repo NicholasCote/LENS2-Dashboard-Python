@@ -181,10 +181,11 @@ def load_datasets_once():
     
     ds = xr.open_mfdataset(
         files,
-        parallel=False,  # Avoid HDF5 locking issues on shared storage
+        parallel=False,
         chunks={'time': 1},
         engine='netcdf4',
-        combine='by_coords'
+        combine='by_coords',
+        lock=False
     )
     
     ds = ds.convert_calendar('standard')
@@ -207,7 +208,8 @@ def load_datasets_once():
         parallel=False,
         chunks={'time': 1},
         engine='netcdf4',
-        combine='by_coords'
+        combine='by_coords',
+        lock=False
     )
     
     std_ds = std_ds.convert_calendar('standard')
