@@ -226,11 +226,6 @@ def load_datasets_once():
     if PERSIST_DATA:
         print("\nPersisting datasets to Dask workers...")
         try:
-            workers_info = client.scheduler_info()['workers']
-            if workers_info:
-                mem_before = sum(w['memory'] for w in workers_info.values()) / 1e9
-                print(f"  Memory before persist: {mem_before:.2f} GB")
-            
             # Persist both datasets
             ds = ds.persist()
             std_ds = std_ds.persist()
@@ -239,11 +234,14 @@ def load_datasets_once():
             print("  Waiting for persistence to complete...")
             dask.distributed.wait([ds, std_ds], timeout=120)
             
-            workers_info = client.scheduler_info()['workers']
+            # Check memory usage
+            workers_info = client.scheduler_info().get('workers', {})
             if workers_info:
-                mem_after = sum(w['memory'] for w in workers_info.values()) / 1e9
-                print(f"  Memory after persist: {mem_after:.2f} GB")
-                print(f"  ✓ Datasets persisted ({mem_after - mem_before:.2f} GB used)")
+                total_mem = sum(
+                    w.get('metrics', {}).get('memory', 0) 
+                    for w in workers_info.values()
+                ) / 1e9
+                print(f"  ✓ Datasets persisted (~{total_mem:.2f} GB in worker memory)")
             else:
                 print("  ✓ Datasets persisted")
         
