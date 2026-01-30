@@ -2,6 +2,9 @@ FROM ghcr.io/dask/dask:latest
 
 USER root
 WORKDIR /home/mambauser/app
+
+COPY environment.yml .
+
 RUN mamba env update -n base -f environment.yml && \
     mamba clean --all -y
 
