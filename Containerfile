@@ -9,7 +9,7 @@ RUN mamba env update -n base -f environment.yml && \
     mamba clean --all -y
 
 # Pre-download cartopy data into lens2 environment
-RUN micromamba run -n lens2 python -c "\
+RUN mamba run -n lens2 python -c "\
 import cartopy.io.shapereader as shpreader; \
 shpreader.natural_earth(resolution='110m', category='physical', name='coastline'); \
 print('✓ Cartopy coastline data downloaded')"
