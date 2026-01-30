@@ -34,22 +34,16 @@ spec:
           - mountPath: /home/mambauser/app/LENS2-ncote-dashboard/data_files/
             name: data-files
         readinessProbe:
-          httpGet:
-            path: /
+          tcpSocket:
             port: {{ .Values.webapp.container.port }}
           initialDelaySeconds: 60
           periodSeconds: 30
-          timeoutSeconds: 30
-          successThreshold: 1
-          failureThreshold: 10
+          
         livenessProbe:
-          httpGet:
-            path: /
+          tcpSocket:
             port: {{ .Values.webapp.container.port }}
           initialDelaySeconds: 120
           periodSeconds: 60
-          timeoutSeconds: 30
-          failureThreshold: 5
       volumes:
         - name: data-files
           persistentVolumeClaim:
