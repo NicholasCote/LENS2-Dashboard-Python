@@ -30,6 +30,9 @@ spec:
           - --nthreads=4         
           - --memory-limit=32GB   
           - --death-timeout=60
+        env:
+          - name: HDF5_USE_FILE_LOCKING
+            value: "FALSE"
         resources:
           limits:
             memory: {{ .Values.worker.container.memory }}
