@@ -3,14 +3,11 @@ FROM ghcr.io/dask/dask:latest
 USER root
 WORKDIR /home/mambauser/app
 
-# Use mamba, not pip
-RUN mamba install -y -c conda-forge \
-    netcdf4 \
-    h5netcdf \
-    boto3==1.28.85 \
-    pandas==2.3.3 \
-    numpy==2.2.4 \
-    && mamba clean --all -y
+COPY environment.yml .
+
+# Install same packages as Bokeh container
+RUN mamba env update -n base -f environment.yml && \
+    mamba clean --all -y
 
 COPY src/cesm-2-dashboard/prepare.sh /usr/bin/prepare.sh
 COPY src/cesm-2-dashboard/stratus.py .
