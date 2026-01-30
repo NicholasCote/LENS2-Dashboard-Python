@@ -13,7 +13,7 @@ RUN python -c "import cartopy.io.shapereader as shpreader; \
     shpreader.natural_earth(resolution='110m', category='physical', name='coastline'); \
     print('✓ Cartopy coastline data downloaded')"
 
-COPY --chown=mambauser src/cesm-2-dashboard/ .
+COPY src/cesm-2-dashboard/ .
 
 # Set environment variables (ENV_NAME will be set by Helm deployment)
 ENV PYTHONUNBUFFERED=1
