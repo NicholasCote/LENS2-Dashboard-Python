@@ -1,19 +1,25 @@
-FROM ghcr.io/dask/dask
+FROM ghcr.io/dask/dask:latest
 
-ENV DEBIAN_FRONTEND=noninteractive
+USER root
+WORKDIR /home/mambauser/app
+RUN chown mambauser:mambauser /home/mambauser/app
 
-RUN apt-get update
+USER mambauser
 
-RUN mkdir -p /home/mambauser/app
+# Use mamba, not pip
+RUN mamba install -y -c conda-forge \
+    netcdf4 \
+    h5netcdf \
+    boto3==1.28.85 \
+    pandas==2.3.3 \
+    numpy==2.2.4 \
+    && mamba clean --all -y
 
 COPY src/cesm-2-dashboard/prepare.sh /usr/bin/prepare.sh
-COPY src/cesm-2-dashboard/stratus.py /home/mambauser/app
-COPY src/cesm-2-dashboard/get_data.py /home/mambauser/app
-COPY src/cesm-2-dashboard/LENS2-ncote-dashboard /home/mambauser/app/LENS2-ncote-dashboard
-COPY requirements.txt .
+COPY src/cesm-2-dashboard/stratus.py .
+COPY src/cesm-2-dashboard/get_data.py .
+COPY src/cesm-2-dashboard/LENS2-ncote-dashboard ./LENS2-ncote-dashboard
 
-RUN pip install --no-cache-dir -r requirements.txt
-
-WORKDIR /home/mambauser/app
+ENV HDF5_USE_FILE_LOCKING=FALSE
 
 ENTRYPOINT ["tini", "-g", "--", "/usr/bin/prepare.sh"]

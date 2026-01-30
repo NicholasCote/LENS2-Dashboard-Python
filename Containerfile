@@ -1,22 +1,14 @@
-FROM docker.io/mambaorg/micromamba:latest
+FROM ghcr.io/dask/dask:latest
 
 USER root
-
-ENV DEBIAN_FRONTEND=noninteractive
-
-RUN apt-get update
-
 WORKDIR /home/mambauser/app
-
 RUN chown mambauser:mambauser /home/mambauser/app
 
 USER mambauser
 
 COPY --chown=mambauser environment.yml .
-
-# Create lens2 environment
-RUN micromamba env create -f environment.yml && \
-    micromamba clean --all --yes
+RUN mamba env update -n base -f environment.yml && \
+    mamba clean --all -y
 
 # Pre-download cartopy data into lens2 environment
 RUN micromamba run -n lens2 python -c "\
