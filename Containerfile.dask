@@ -3,7 +3,6 @@ FROM ghcr.io/dask/dask
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update
-RUN apt-get install -y python3.9
 
 RUN mkdir -p /home/mambauser/app
 
