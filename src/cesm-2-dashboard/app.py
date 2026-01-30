@@ -9,6 +9,7 @@ import os
 import time
 
 from dask.distributed import Client
+from dask.utils import SerializableLock
 import dask
 from holoviews.operation.datashader import rasterize
 from holoviews import opts, streams
@@ -185,7 +186,7 @@ def load_datasets_once():
         chunks={'time': 1},
         engine='netcdf4',
         combine='by_coords',
-        lock=False
+        lock=SerializableLock()
     )
     
     ds = ds.convert_calendar('standard')
@@ -209,7 +210,7 @@ def load_datasets_once():
         chunks={'time': 1},
         engine='netcdf4',
         combine='by_coords',
-        lock=False
+        lock=SerializableLock()
     )
     
     std_ds = std_ds.convert_calendar('standard')
