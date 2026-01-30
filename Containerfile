@@ -2,11 +2,6 @@ FROM ghcr.io/dask/dask:latest
 
 USER root
 WORKDIR /home/mambauser/app
-RUN chown mambauser:mambauser /home/mambauser/app
-
-USER mambauser
-
-COPY --chown=mambauser environment.yml .
 RUN mamba env update -n base -f environment.yml && \
     mamba clean --all -y
 
